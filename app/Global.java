@@ -42,7 +42,7 @@ public class Global extends GlobalSettings {
 
         // HV3-235-Z75-68R-K84 (Not in system)
 
-        /* This is all used for election authority + key loading...
+        // This is all used for election authority + key loading...
 
         System.out.println("Initializing the Ballot Loader");
         BallotLoader.init();
@@ -90,6 +90,6 @@ public class Global extends GlobalSettings {
             System.out.println("Initial data was loaded.");
             Ebean.save((List) Yaml.load("initial-data.yml"));
         }
-*/
+
     }
 }
