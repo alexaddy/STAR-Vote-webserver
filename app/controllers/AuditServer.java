@@ -851,6 +851,8 @@ public class AuditServer extends Controller {
 
         /* Code for this method in handling a POST command are found at http://www.vogella.com/articles/ApacheHttpClient/article.html */
 
+        System.out.println("Running ballot load event");
+
         final Map<String, String[]> values = request().body().asFormUrlEncoded();
         final String record = values.get("record")[0];
 
@@ -864,6 +866,13 @@ public class AuditServer extends Controller {
         try {
             ObjectInputStream o = new ObjectInputStream(new ByteArrayInputStream(bytes));
             votingRecord = (Map<String, Map<String, Precinct<ExponentialElGamalCiphertext>>>) o.readObject();
+            // TODO: extract out the ballot ID and their status.
+            for(String id : votingRecord.keySet()) {
+                System.out.println("Voting record key " + id);
+                for (String id2 : votingRecord.get(id).keySet()) {
+                    System.out.println("Voting record value's key " + id2);
+                }
+            }
         }
         catch (IOException | ClassNotFoundException | ClassCastException e) { e.printStackTrace(); }
 
