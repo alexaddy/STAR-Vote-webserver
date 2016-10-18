@@ -706,6 +706,8 @@ public class AuditServer extends Controller {
             List<AdderPrivateKeyShare> privateKeyShares = new ArrayList<>();
 
             int threshold = AuthorityManager.SESSION.getDecryptionThreshold();
+
+            System.out.println("Auth list size " + authList.size());
             if (threshold > authList.size()) throw new RuntimeException("Decryption threshold was greater than number of private keys present!");
 
             AdderPrivateKeyShare[] privateKeySharesArray = new AdderPrivateKeyShare[threshold];
@@ -856,7 +858,7 @@ public class AuditServer extends Controller {
         final Map<String, String[]> values = request().body().asFormUrlEncoded();
         final String record = values.get("record")[0];
 
-        /* TODO Note that this is random right now, but will be the origin precinctID */
+        /* TODO: Note that this is random right now, but will be the origin precinctID */
         final String precinctID = values.get("precinctID")[0];
 
         /* Decode from base64 */
@@ -868,9 +870,12 @@ public class AuditServer extends Controller {
             votingRecord = (Map<String, Map<String, Precinct<ExponentialElGamalCiphertext>>>) o.readObject();
             // TODO: extract out the ballot ID and their status.
             for(String id : votingRecord.keySet()) {
-                System.out.println("Voting record key " + id);
+                System.out.println("Voting machine serial " + id);
                 for (String id2 : votingRecord.get(id).keySet()) {
-                    System.out.println("Voting record value's key " + id2);
+                    System.out.println("Precinct " + id2);
+                    String bid = votingRecord.get(id).get(id2).getChallengedBallots().get(0).getBid();
+                   // System.out.println(votingRecord.get(id).get(id2).getChallengedBallots().get(0).getBid());
+                    //ChallengedBallot.create(new ChallengedBallot(bid, id2 , "challengedHash", "decryptedBallot"));
                 }
             }
         }
