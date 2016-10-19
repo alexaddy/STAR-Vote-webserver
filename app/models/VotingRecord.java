@@ -4,6 +4,9 @@ import crypto.ExponentialElGamalCiphertext;
 import org.apache.commons.codec.binary.Base64;
 import play.db.ebean.Model;
 import supervisor.model.Precinct;
+import supervisor.model.Ballot;
+import crypto.EncryptedRaceSelection;
+
 
 import javax.persistence.*;
 import java.io.*;
@@ -47,9 +50,23 @@ public class VotingRecord extends Model {
 
         this.precinctID = precinctID;
         isConflicted = (records.size() > 1);
-        
-        for (Map.Entry<String, Map<String, Precinct<ExponentialElGamalCiphertext>>> entry : records.entrySet())
+        for (Map.Entry<String, Map<String, Precinct<ExponentialElGamalCiphertext>>> entry : records.entrySet()) {
             supervisorRecords.put(entry.getKey(), new SupervisorRecord(this, entry.getKey(), recordToString(entry.getValue())));
+            for (Map.Entry<String, Precinct<ExponentialElGamalCiphertext>> precinctEntry : entry.getValue().entrySet()) {
+                for (Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>> challengedBallot : precinctEntry.getValue().getChallengedBallots()) {
+                    if (ChallengedBallot.getBallot(challengedBallot.getBid()) == null) {
+                        System.out.println("Get challenged ballot " + challengedBallot.getBid());
+                        ChallengedBallot.create(new ChallengedBallot(challengedBallot.getBid(), precinctEntry.getKey(), "challengedHash", "decryptedBallot"));
+                    }
+                }
+                for (Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>> castedBallot : precinctEntry.getValue().getCastedBallots()) {
+                    if (CastBallot.getBallot(castedBallot.getBid()) == null) {
+                        System.out.println("Get casted ballot " + castedBallot.getBid());
+                        CastBallot.create(new CastBallot(castedBallot.getBid(), "casHash"));
+                    }
+                }
+            }
+        }
     }
 
     private String recordToString(Map<String, Precinct<ExponentialElGamalCiphertext>> s) {
@@ -201,6 +218,7 @@ public class VotingRecord extends Model {
      * @param record        record to be stored
      */
     public static void create(VotingRecord record) { 
+        // separate the casted and spoiled ballot and store them as in global.java
         record.save();
     }
 
