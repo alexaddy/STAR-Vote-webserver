@@ -216,769 +216,779 @@ public class AuditServer extends Controller {
      * @param bid       the unique ballot identifier for the ballot to get
      * @return          the page for confirmed/cast ballots viewing
      */
-    public static Result getCastBallot(String bid) {
-
-        String errorCode = "**Could not locate a cast ballot with Ballot Identification Number (BID): " + bid +
-                           ". If the BID you entered is correctly displayed, please contact your local election office.**";
-
-        /* Database lookup */
-        CastBallot ballot = CastBallot.getBallot(bid);
-
-        /* Make sure the ballot is okay, then search for it, otherwise return an error page */
-        if (ballot != null) return ok(castballotfound.render(ballot, bid));
-        else                return ok(confirmballot.render(CastBallot.all(), confirmForm, errorCode));
-
-    }
-
-
-
-
-
-    /*---------------------------------------- ADMIN METHODS -----------------------------------------------*/
-
-    /**
-     * Verifies that the username and password entered at the admin login screen are correct
-     *
-     * @return      the admin page of the website
-     */
-    public static Result adminverify() {
-        return ok(adminlogin.render(form(Login.class), null));
-    }
-
-    @Security.Authenticated(Secured.class)
-    @Restrict(@Group("admin"))
-    public static Result adminmain() {
-        return ok(adminmain.render());
-    }
-
-    /**
-     * Verifies that the admin is currently logged in, then clears data from the ebean database.
-     * Serves up admin page with success message if admin logged in, or error page if admin not logged in.
-     *
-     * @return      the admin page with success/error dependent on login success
-     */
-    @Security.Authenticated(Secured.class)
-    @Restrict(@Group("admin"))
-    public static Result adminclear() {
-
-        String message = "No data to clear!";
-
-        if(CastBallot.all().size() > 0 || ChallengedBallot.all().size() > 0) {
-            /* Destroy all the cast ballot / challenged ballot info from the database */
-            for (CastBallot cb: CastBallot.all())  CastBallot.remove(cb);
-            for (ChallengedBallot cb: ChallengedBallot.all()) ChallengedBallot.remove(cb);
-            
-            
-            message = "";
-        }
-        
-        /* Send to the data cleared page */
-        return ok(adminclear.render(message));
-    }
-    
-    /**
-     *  Generates and renders the page for handling conflicts
-     */
-    @Security.Authenticated(Secured.class)
-    @Restrict(@Group("admin"))
-    public static Result adminconflicts() {
-        return ok(adminconflicts.render(VotingRecord.getConflicted()));
-    }
-    
-    @Security.Authenticated(Secured.class)
-    @Restrict(@Group("admin"))
-    public static Result resolveconflict(String id, String hash) {
+  public static Result getCastBallot(String bid) {
 
-        hash = hash.substring(0, hash.length()-1);
-        VotingRecord.getRecord(id).resolveConflict(hash);
-        return ok(adminconflicts.render(VotingRecord.getConflicted()));
-    }
+      String errorCode = "**Could not locate a cast ballot with Ballot Identification Number (BID): " + bid +
+                         ". If the BID you entered is correctly displayed, please contact your local election office.**";
 
-    /**
-     * Generates and renders the page for publishing results 
-     */    
-    @Security.Authenticated(Secured.class)
-    @Restrict(@Group("admin"))
-    public static Result adminpublish() {
-        return ok(adminpublish.render(VotingRecord.getUnpublished(), VotingRecord.getPublished(), PEK != null, ""));
-    }
-    
-    @Security.Authenticated(Secured.class)
-    @Restrict(@Group("admin"))
-    public static Result publishresults() {
+      /* Database lookup */
+      CastBallot ballot = CastBallot.getBallot(bid);
 
+      /* Make sure the ballot is okay, then search for it, otherwise return an error page */
+      if (ballot != null) return ok(castballotfound.render(ballot, bid));
+      else                return ok(confirmballot.render(CastBallot.all(), confirmForm, errorCode));
 
+  }
 
-            /* Reverse routing */
-            String records = request().getQueryString("records");
-            String message = "There was an issue publishing the last set of records!";
-            int start = 0;
 
-        try {
 
-            Map<String, Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>> summedTotals = getSummedTotals();
-            Map<String, List<Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>>> precinctTotals = new TreeMap<>();
-            Map<String, Precinct<ExponentialElGamalCiphertext>> precinctMap;
 
-            /* Grab each selected precinct and publish it */
-            while (start < records.length()) {
 
-                int end = records.indexOf(",", start);
+  /*---------------------------------------- ADMIN METHODS -----------------------------------------------*/
 
-                if (end == -1)
-                    end = records.length();
+  /**
+   * Verifies that the username and password entered at the admin login screen are correct
+   *
+   * @return      the admin page of the website
+   */
+  public static Result adminverify() {
+      return ok(adminlogin.render(form(Login.class), null));
+  }
 
-                /* Get the precinct ID from the query string */
-                String precinctID = records.substring(start, end);
+  @Security.Authenticated(Secured.class)
+  @Restrict(@Group("admin"))
+  public static Result adminmain() {
+      return ok(adminmain.render());
+  }
 
-                System.out.println(precinctID);
+  /**
+   * Verifies that the admin is currently logged in, then clears data from the ebean database.
+   * Serves up admin page with success message if admin logged in, or error page if admin not logged in.
+   *
+   * @return      the admin page with success/error dependent on login success
+   */
+  @Security.Authenticated(Secured.class)
+  @Restrict(@Group("admin"))
+  public static Result adminclear() {
 
-                /* Pull out the current record to be published */
-                VotingRecord vr = VotingRecord.getRecord(precinctID);
+      String message = "No data to clear!";
 
-                /* Publish the record */
-                vr.openRecord();
+      if(CastBallot.all().size() > 0 || ChallengedBallot.all().size() > 0) {
+          /* Destroy all the cast ballot / challenged ballot info from the database */
+          for (CastBallot cb: CastBallot.all())  CastBallot.remove(cb);
+          for (ChallengedBallot cb: ChallengedBallot.all()) ChallengedBallot.remove(cb);
 
-                /* Get the Precincts from this VotingRecord (Encrypted!) */
-                System.out.println("Getting the Precinct Map... ");
-                precinctMap = vr.getPrecinctMap();
-                System.out.println("\t" + precinctMap);
 
-                /* Add the results from the Precincts in this VotingRecord to precinctTotals */
-                System.out.println("Updating Precinct Totals... ");
-                precinctTotals = updatePrecinctTotals(precinctMap);
+          message = "";
+      }
 
-                /* Move on to the next VotingRecord to be published */
-                start = end + 1;
-            }
+      /* Send to the data cleared page */
+      return ok(adminclear.render(message));
+  }
 
-            System.out.println("Summed totals! " + summedTotals);
+  /**
+   *  Generates and renders the page for handling conflicts
+   */
+  @Security.Authenticated(Secured.class)
+  @Restrict(@Group("admin"))
+  public static Result adminconflicts() {
+      return ok(adminconflicts.render(VotingRecord.getConflicted()));
+  }
 
-            /* Combine the newly published result totals with the old totals */
-            System.out.println("Updating Summed Totals... ");
-            updateSummedTotals(summedTotals, precinctTotals);
+  @Security.Authenticated(Secured.class)
+  @Restrict(@Group("admin"))
+  public static Result resolveconflict(String id, String hash) {
 
-            System.out.println("Summed totals! " + summedTotals);
-            /* Decrypt and store the final updated totals for each Precinct */
-            System.out.println("Storing Decrypted Summed Totals... ");
-            storeDecryptedSummedTotals(summedTotals);
+      hash = hash.substring(0, hash.length()-1);
+      VotingRecord.getRecord(id).resolveConflict(hash);
+      return ok(adminconflicts.render(VotingRecord.getConflicted()));
+  }
 
-            start =0;
+  /**
+   * Generates and renders the page for publishing results
+   */
+  @Security.Authenticated(Secured.class)
+  @Restrict(@Group("admin"))
+  public static Result adminpublish() {
+      return ok(adminpublish.render(VotingRecord.getUnpublished(), VotingRecord.getPublished(), PEK != null, ""));
+  }
 
-            while (start < records.length()) {
+  @Security.Authenticated(Secured.class)
+  @Restrict(@Group("admin"))
+  public static Result publishresults() {
 
-                int end = records.indexOf(",", start);
 
-                if (end == -1)
-                    end = records.length();
 
-                /* Get the precinct ID from the query string */
-                String precinctID = records.substring(start, end);
+          /* Reverse routing */
+          String records = request().getQueryString("records");
+          String message = "There was an issue publishing the last set of records!";
+          int start = 0;
 
-                System.out.println(precinctID);
+      try {
 
-                /* Pull out the current record to be published */
-                VotingRecord vr = VotingRecord.getRecord(precinctID);
+          Map<String, Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>> summedTotals = getSummedTotals();
+          Map<String, List<Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>>> precinctTotals = new TreeMap<>();
+          Map<String, Precinct<ExponentialElGamalCiphertext>> precinctMap;
 
-                /* Publish the record */
-                vr.publish();
-                start= end+1;
-            }
+          /* Grab each selected precinct and publish it */
+          while (start < records.length()) {
 
-            message = "Published!";
-        }
-        catch (Exception e) {
+              int end = records.indexOf(",", start);
 
-            e.printStackTrace();
+              if (end == -1)
+                  end = records.length();
 
-            /* If we run into a problem publishing, make sure to close all of the records */
-            while (start < records.length()) {
+              /* Get the precinct ID from the query string */
+              String precinctID = records.substring(start, end);
 
-                int end = records.indexOf(",", start);
+              System.out.println(precinctID);
 
-                if (end == -1)
-                    end = records.length();
+              /* Pull out the current record to be published */
+              VotingRecord vr = VotingRecord.getRecord(precinctID);
 
-                /* Get the precinct ID from the query string */
-                String precinctID = records.substring(start, end);
+              /* Publish the record */
+              vr.openRecord();
 
-                /* Pull out the current record to be closed */
-                VotingRecord vr = VotingRecord.getRecord(precinctID);
+              /* Get the Precincts from this VotingRecord (Encrypted!) */
+              System.out.println("Getting the Precinct Map... ");
+              precinctMap = vr.getPrecinctMap();
+              System.out.println("\t" + precinctMap);
 
-                /* Close the record */
-                vr.closeRecord();
-            }
+              /* Add the results from the Precincts in this VotingRecord to precinctTotals */
+              System.out.println("Updating Precinct Totals... ");
+              precinctTotals = updatePrecinctTotals(precinctMap);
 
+              /* Move on to the next VotingRecord to be published */
+              start = end + 1;
+          }
 
-        }
+          System.out.println("Summed totals! " + summedTotals);
 
-        /* Return the webpage */
-        return ok(adminpublish.render(VotingRecord.getUnpublished(), VotingRecord.getPublished(),
-                PEK != null, message));
-    }
+          /* Combine the newly published result totals with the old totals */
+          System.out.println("Updating Summed Totals... ");
+          updateSummedTotals(summedTotals, precinctTotals);
 
-    @Security.Authenticated(Secured.class)
-    @Restrict(@Group("admin"))
-    public static Result uploadPEK() {
+          System.out.println("Summed totals! " + summedTotals);
+          /* Decrypt and store the final updated totals for each Precinct */
+          System.out.println("Storing Decrypted Summed Totals... ");
+          storeDecryptedSummedTotals(summedTotals);
 
-        /* Load the seed key */
-        JFileChooser chooser = new JFileChooser();
-        FileNameExtensionFilter filter = new FileNameExtensionFilter(".key files", "key");
-        chooser.setFileFilter(filter);
+          start =0;
 
-        int returnVal = chooser.showOpenDialog(null);
+          while (start < records.length()) {
 
-        if (returnVal == JFileChooser.APPROVE_OPTION) {
-            System.out.println("You chose to open this file: " +
-                    chooser.getSelectedFile().getName());
-        }
+              int end = records.indexOf(",", start);
 
-        try {
+              if (end == -1)
+                  end = records.length();
 
-            File PEKFile = chooser.getSelectedFile();
-            Path PEKPath = PEKFile.toPath();
+              /* Get the precinct ID from the query string */
+              String precinctID = records.substring(start, end);
 
-            byte[] verbatimPEK = Files.readAllBytes(PEKPath);
-            ASExpression PEKASE = ASExpression.makeVerbatim(verbatimPEK);
-            System.out.println(PEKASE);
-            PEK = ASEConverter.convertFromASE((ListExpression) PEKASE);
+              System.out.println(precinctID);
 
-        }
-        catch (Exception e) {
-            System.err.println("Couldn't upload the key file due to " + e.getClass());
+              /* Pull out the current record to be published */
+              VotingRecord vr = VotingRecord.getRecord(precinctID);
 
-        }
+              /* Publish the record */
+              vr.publish();
+              start= end+1;
+          }
 
-        return ok(adminpublish.render(VotingRecord.getUnpublished(), VotingRecord.getPublished(), PEK != null, ""));
-    }
+          message = "Published!";
+      }
+      catch (Exception e) {
 
-    /*---------------------------------------- ADMIN METHODS -----------------------------------------------*/
+          e.printStackTrace();
 
+          /* If we run into a problem publishing, make sure to close all of the records */
+          while (start < records.length()) {
 
+              int end = records.indexOf(",", start);
 
+              if (end == -1)
+                  end = records.length();
 
+              /* Get the precinct ID from the query string */
+              String precinctID = records.substring(start, end);
 
+              /* Pull out the current record to be closed */
+              VotingRecord vr = VotingRecord.getRecord(precinctID);
 
-    /*-------------------------------------- AUTHORITY METHODS -----------------------------------------------*/
+              /* Close the record */
+              vr.closeRecord();
+          }
 
-    /**
-     * Verifies that the username and password entered at the authority login screen are correct
-     *
-     * @return      the authority login page of the website
-     */
-    public static Result authorityverify() {
-        return ok(authoritylogin.render(form("authoritylogin", Login.class), null));
-    }
 
-    /**
-     * This will take the session user and show a page for key generation for the specific user
-     * @return
-     */
-    @Security.Authenticated(Secured.class)
-    @Restrict(@Group("authority"))
-    public static Result authority() {
-        return ok(authoritymain.render(request().username(), "Main Page" ,null));
-    }
+      }
 
-    @Security.Authenticated(Secured.class)
-    @Restrict(@Group("authority"))
-    public static Result keygeneration() {
+      /* Return the webpage */
+      return ok(adminpublish.render(VotingRecord.getUnpublished(), VotingRecord.getPublished(),
+              PEK != null, message));
+  }
 
-        int stage = AuthorityManager.SESSION.getStage(request().username());
-        String message = stage == 1 ? "KeySharePair generation stage (1)" :
-                         stage == 2 ? "Polynomial generation stage (2)" :
-                         stage == 3 ? "Private Key-share generation stage (3)" : "Complete!";
+  @Security.Authenticated(Secured.class)
+  @Restrict(@Group("admin"))
+  public static Result uploadPEK() {
 
-        if (message.equals("Complete!")) {
-            writePEKtoFile();
-            storeAuthorityData();
-        }
+      /* Load the seed key */
+      JFileChooser chooser = new JFileChooser();
+      FileNameExtensionFilter filter = new FileNameExtensionFilter(".key files", "key");
+      chooser.setFileFilter(filter);
 
-        return ok(authorityprocedure.render(message, request().username(), stage));
-    }
+      int returnVal = chooser.showOpenDialog(null);
 
-    private static void writePEKtoFile(){
+      if (returnVal == JFileChooser.APPROVE_OPTION) {
+          System.out.println("You chose to open this file: " +
+                  chooser.getSelectedFile().getName());
+      }
 
-        try {
+      try {
 
-            PEK = AuthorityManager.SESSION.generatePublicEncryptionKey();
+          File PEKFile = chooser.getSelectedFile();
+          Path PEKPath = PEKFile.toPath();
 
-            File destDir = new File("keys");
+          byte[] verbatimPEK = Files.readAllBytes(PEKPath);
+          ASExpression PEKASE = ASExpression.makeVerbatim(verbatimPEK);
+          System.out.println(PEKASE);
+          PEK = ASEConverter.convertFromASE((ListExpression) PEKASE);
 
-            /* Checks whether the destination directory already exists, if not then make the directory. */
-            if(!destDir.exists()){
-                destDir.mkdirs();
-            }
+      }
+      catch (Exception e) {
+          System.err.println("Couldn't upload the key file due to " + e.getClass());
 
-            /* If it exists then it checks whether its a directory or not. */
-            else{
+      }
 
-                if(!destDir.isDirectory()){
-                    System.out.println("Usage: java " + AuthorityManager.class.getName() + " [destination directory]");
-                    System.exit(-1);
-                }
-            }
+      return ok(adminpublish.render(VotingRecord.getUnpublished(), VotingRecord.getPublished(), PEK != null, ""));
+  }
 
-            File pekFile = new File("keys", "PEK.adder.key");
+  /*---------------------------------------- ADMIN METHODS -----------------------------------------------*/
 
-            FileOutputStream fos = new FileOutputStream(pekFile);
-            fos.write(ASEConverter.convertToASE(PEK).toVerbatim());
-            fos.flush();
-            fos.close();
-        }
-        catch (Exception e) { e.printStackTrace(); }
-    }
 
-    private static void storeAuthorityData(){
 
-        try {
-            File userFile = new File("conf", "user-data.yml");
-            File authorityFile = new File("conf", "authority-data.inf");
 
-            FileOutputStream fos = new FileOutputStream(authorityFile);
-            fos.write(ASEConverter.convertToASE(AuthorityManager.SESSION).toVerbatim());
-            fos.flush();
-            fos.close();
 
-            Yaml yaml = new Yaml();
-            FileWriter writer = new FileWriter(userFile);
-            yaml.dump(User.find.all(), writer);
-            writer.close();
-        }
-        catch (IOException e) { System.err.println("Could not write the authority file!"); }
-    }
 
-    @Security.Authenticated(Secured.class)
-    @Restrict(@Group("authority"))
-    public static Result updateprocedure() {
+  /*-------------------------------------- AUTHORITY METHODS -----------------------------------------------*/
 
-        String auth = request().username();
+  /**
+   * Verifies that the username and password entered at the authority login screen are correct
+   *
+   * @return      the authority login page of the website
+   */
+  public static Result authorityverify() {
+      return ok(authoritylogin.render(form("authoritylogin", Login.class), null));
+  }
 
-        /* Process for this */
-        int stage = AuthorityManager.SESSION.getStage(auth);
+  /**
+   * This will take the session user and show a page for key generation for the specific user
+   * @return
+   */
+  @Security.Authenticated(Secured.class)
+  @Restrict(@Group("authority"))
+  public static Result authority() {
+      return ok(authoritymain.render(request().username(), "Main Page" ,null));
+  }
 
-        try {
-            switch (stage) {
+  @Security.Authenticated(Secured.class)
+  @Restrict(@Group("authority"))
+  public static Result keygeneration() {
 
-                case 1:
-                    AuthorityManager.SESSION.generateAuthorityKeySharePair(auth);
-                    break;
+      int stage = AuthorityManager.SESSION.getStage(request().username());
+      String message = stage == 1 ? "KeySharePair generation stage (1)" :
+                       stage == 2 ? "Polynomial generation stage (2)" :
+                       stage == 3 ? "Private Key-share generation stage (3)" : "Complete!";
 
-                case 2:
-                    AuthorityManager.SESSION.generateAuthorityPolynomialValues(auth);
-                    break;
+      if (message.equals("Complete!")) {
+          writePEKtoFile();
+          storeAuthorityData();
+      }
 
-                /* TODO Need to know if we can keep these on the webserver */
-                case 3:
-                    User u = User.find.byId(request().username());
-                    u.setKey(AuthorityManager.SESSION.generateRealPrivateKeyShare(auth));
-                    break;
+      return ok(authorityprocedure.render(message, request().username(), stage));
+  }
 
-                default:
-                    break;
-            }
+  private static void writePEKtoFile(){
 
-        } catch (Exception e) {e.printStackTrace();}
-        return keygeneration();
-    }
+      try {
 
-    /* TODO will talk about whether this is necessary or if current system is fine */
-    @Security.Authenticated(Secured.class)
-    @Restrict(@Group("authority"))
-    public static Result uploadkey() {
+          PEK = AuthorityManager.SESSION.generatePublicEncryptionKey();
 
-        /* Get key from form submission -- s expression? -- and load into adderkeymanipulator for stage 3 */
-        return null;
-    }
+          File destDir = new File("keys");
 
+          /* Checks whether the destination directory already exists, if not then make the directory. */
+          if(!destDir.exists()){
+              destDir.mkdirs();
+          }
 
-    /*-------------------------------------- AUTHORITY METHODS -----------------------------------------------*/
+          /* If it exists then it checks whether its a directory or not. */
+          else{
 
-    /**
-     * @return a Map of the current summed results Ballot for each Precinct by precinct ID
-     */
-    private static Map<String, Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>> getSummedTotals() {
+              if(!destDir.isDirectory()){
+                  System.out.println("Usage: java " + AuthorityManager.class.getName() + " [destination directory]");
+                  System.exit(-1);
+              }
+          }
 
-        Map<String, Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>> summedTotals = new TreeMap<>();
+          File pekFile = new File("keys", "PEK.adder.key");
 
-        /* Extract the precinct ID and ENCRYPTED results Ballot from each DecryptedResult */
-        for(DecryptedResult result : DecryptedResult.all())
-                summedTotals.put(result.precinctID, result.getResultsBallot());
+          FileOutputStream fos = new FileOutputStream(pekFile);
+          fos.write(ASEConverter.convertToASE(PEK).toVerbatim());
+          fos.flush();
+          fos.close();
+      }
+      catch (Exception e) { e.printStackTrace(); }
+  }
 
-        return summedTotals;
-    }
+  private static void storeAuthorityData(){
 
-    /**
-     * Adds the summed result Ballots for each of the Precincts in this precinctMap to precinctTotals. Helper method
-     * for publishresults()
-     * 
-     * @param precinctMap   the map of just-published Precinct result totals, mapped from precinct ID to a precinct of ballots
-     *                      
-     * @return the updated precinctTotals
-     */
-    private static Map<String, List<Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>>> updatePrecinctTotals(
-            Map<String, Precinct<ExponentialElGamalCiphertext>> precinctMap) {
+      try {
+          File userFile = new File("conf", "user-data.yml");
+          File authorityFile = new File("conf", "authority-data.inf");
 
-        Map<String, List<Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>>> precinctTotals = new TreeMap<>();
+          FileOutputStream fos = new FileOutputStream(authorityFile);
+          fos.write(ASEConverter.convertToASE(AuthorityManager.SESSION).toVerbatim());
+          fos.flush();
+          fos.close();
 
-        /* Get the cast ballot totals for each precinct in this voting record */
-        for (Map.Entry<String, Precinct<ExponentialElGamalCiphertext>> entry : precinctMap.entrySet()) {
+          Yaml yaml = new Yaml();
+          FileWriter writer = new FileWriter(userFile);
+          yaml.dump(User.find.all(), writer);
+          writer.close();
+      }
+      catch (IOException e) { System.err.println("Could not write the authority file!"); }
+  }
 
-            Precinct<ExponentialElGamalCiphertext> p = entry.getValue();
-            String precinctID = entry.getKey();
+  @Security.Authenticated(Secured.class)
+  @Restrict(@Group("authority"))
+  public static Result updateprocedure() {
 
-            /* Initialise the list for this precinct if we haven't yet seen it */
-            if (precinctTotals.get(precinctID) == null)
-                precinctTotals.put(precinctID, new ArrayList<>());
+      String auth = request().username();
 
-            System.out.println("\tPrecinct totals: " + precinctTotals);
-            System.out.println("\tP: " + p);
-            System.out.println("\tPrecinct ID: " + precinctID);
+      /* Process for this */
+      int stage = AuthorityManager.SESSION.getStage(auth);
 
-            Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>> total = p.getCastBallotTotal(PEK);
+      try {
+          switch (stage) {
 
-            for (int i=0; i<total.getRaceSelections().size(); i++)
-                System.out.println("\t\t" + p.getCastBallotTotal(PEK).getRaceSelections().get(i).getRaceSelectionsMap());
+              case 1:
+                  AuthorityManager.SESSION.generateAuthorityKeySharePair(auth);
+                  break;
 
-            /* Store the total for that precinct in the list */
-            precinctTotals.get(precinctID).add(p.getCastBallotTotal(PEK));
-        }
+              case 2:
+                  AuthorityManager.SESSION.generateAuthorityPolynomialValues(auth);
+                  break;
 
-        return precinctTotals;
-    }
+              /* TODO Need to know if we can keep these on the webserver */
+              case 3:
+                  User u = User.find.byId(request().username());
+                  u.setKey(AuthorityManager.SESSION.generateRealPrivateKeyShare(auth));
+                  break;
 
-    /**
-     * Adds newly published results in precinctTotals to summedTotals (the public running tally). Helper method for
-     * publishresults()
-     *
-     * @param precinctTotals    the map of just-published Precinct result totals, mapped from precinct ID to a list of ballots
-     * @param summedTotals      the public running tally of totals mapped from precinct ID to precinct results Ballot
-     */
-    private static <T extends AHomomorphicCiphertext<T>> void updateSummedTotals(
-            Map<String, Ballot<EncryptedRaceSelection<T>>> summedTotals, Map<String, List<Ballot<EncryptedRaceSelection<T>>>> precinctTotals) {
+              default:
+                  break;
+          }
 
-        /* Update summed totals that already exist */
-        for (Map.Entry<String, List<Ballot<EncryptedRaceSelection<T>>>> entry : precinctTotals.entrySet()) {
+      } catch (Exception e) {e.printStackTrace();}
+      return keygeneration();
+  }
 
-            /* Find for which Precinct this is */
-            String precinctID = entry.getKey();
+  /* TODO will talk about whether this is necessary or if current system is fine */
+  @Security.Authenticated(Secured.class)
+  @Restrict(@Group("authority"))
+  public static Result uploadkey() {
 
-            /* Pull out the preExisting total if it exists */
-            Ballot<EncryptedRaceSelection<T>> preExisting = summedTotals.get(precinctID);
+      /* Get key from form submission -- s expression? -- and load into adderkeymanipulator for stage 3 */
+      return null;
+  }
 
-            List<Ballot<EncryptedRaceSelection<T>>> thisPrecinctTotal = precinctTotals.get(precinctID);
 
-            /* Add in any pre-existing totals from summedTotals */
-            if(preExisting != null)
-                thisPrecinctTotal.add(preExisting);
+  /*-------------------------------------- AUTHORITY METHODS -----------------------------------------------*/
 
-            /* Tally the new precinctTotals using WebServerTallier*/
-            Ballot<EncryptedRaceSelection<T>> b = WebServerTallier.tally(precinctID, thisPrecinctTotal, PEK);
+  /**
+   * @return a Map of the current summed results Ballot for each Precinct by precinct ID
+   */
+  private static Map<String, Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>> getSummedTotals() {
 
-            /* Replace old totals with new totals */
-            summedTotals.put(precinctID, b);
-        }
+      Map<String, Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>> summedTotals = new TreeMap<>();
 
-    }
+      /* Extract the precinct ID and ENCRYPTED results Ballot from each DecryptedResult */
+      for(DecryptedResult result : DecryptedResult.all())
+              summedTotals.put(result.precinctID, result.getResultsBallot());
 
-    /**
-     * Decrypts and stores the summed totals (the public running tally). Helper method for publishresults()
-     *
-     * @param summedTotals  the public running tally of totals mapped from precinct ID to precinct results Ballot
-     */
-    private static void storeDecryptedSummedTotals(Map<String, Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>> summedTotals) throws Exception {
+      return summedTotals;
+  }
 
-        System.out.println("Decrypting summedTotals...");
+  /**
+   * Adds the summed result Ballots for each of the Precincts in this precinctMap to precinctTotals. Helper method
+   * for publishresults()
+   *
+   * @param precinctMap   the map of just-published Precinct result totals, mapped from precinct ID to a precinct of ballots
+   *
+   * @return the updated precinctTotals
+   */
+  private static Map<String, List<Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>>> updatePrecinctTotals(
+          Map<String, Precinct<ExponentialElGamalCiphertext>> precinctMap) {
 
-        /* Decrypt summedTotals */
-        for(Map.Entry<String, Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>> entry : summedTotals.entrySet()) {
+      Map<String, List<Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>>> precinctTotals = new TreeMap<>();
 
-            Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>> b = entry.getValue();
-            String precinctID = entry.getKey();
+      /* Get the cast ballot totals for each precinct in this voting record */
+      for (Map.Entry<String, Precinct<ExponentialElGamalCiphertext>> entry : precinctMap.entrySet()) {
 
-            Ballot<PlaintextRaceSelection> decryptB;
+          Precinct<ExponentialElGamalCiphertext> p = entry.getValue();
+          String precinctID = entry.getKey();
 
-            /* Load the ICryptoType */
-            DHExponentialElGamalCryptoType t = new DHExponentialElGamalCryptoType();
+          /* Initialise the list for this precinct if we haven't yet seen it */
+          if (precinctTotals.get(precinctID) == null)
+              precinctTotals.put(precinctID, new ArrayList<>());
 
-            /* Get all the privateKeyShares from the authorities database */
-            List<User> authList = User.find.where().eq("userRole","authority").ne("key", null).findList();
-            List<AdderPrivateKeyShare> privateKeyShares = new ArrayList<>();
+          System.out.println("\tPrecinct totals: " + precinctTotals);
+          System.out.println("\tP: " + p);
+          System.out.println("\tPrecinct ID: " + precinctID);
 
-            int threshold = AuthorityManager.SESSION.getDecryptionThreshold();
+          Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>> total = p.getCastBallotTotal(PEK);
 
-            System.out.println("Auth list size " + authList.size());
-            if (threshold > authList.size()) throw new RuntimeException("Decryption threshold was greater than number of private keys present!");
+          for (int i=0; i<total.getRaceSelections().size(); i++)
+              System.out.println("\t\t" + p.getCastBallotTotal(PEK).getRaceSelections().get(i).getRaceSelectionsMap());
 
-            AdderPrivateKeyShare[] privateKeySharesArray = new AdderPrivateKeyShare[threshold];
+          /* Store the total for that precinct in the list */
+          precinctTotals.get(precinctID).add(p.getCastBallotTotal(PEK));
+      }
 
-            /* Add all the authority keys */
-            for (User authority : authList) {
+      return precinctTotals;
+  }
 
-                while(privateKeyShares.size() < threshold)
-                    privateKeyShares.add(authority.getKey());
-            }
+  /**
+   * Adds newly published results in precinctTotals to summedTotals (the public running tally). Helper method for
+   * publishresults()
+   *
+   * @param precinctTotals    the map of just-published Precinct result totals, mapped from precinct ID to a list of ballots
+   * @param summedTotals      the public running tally of totals mapped from precinct ID to precinct results Ballot
+   */
+  private static <T extends AHomomorphicCiphertext<T>> void updateSummedTotals(
+          Map<String, Ballot<EncryptedRaceSelection<T>>> summedTotals,
+          Map<String, List<Ballot<EncryptedRaceSelection<T>>>> precinctTotals) {
 
+      /* Update summed totals that already exist */
+      for (Map.Entry<String, List<Ballot<EncryptedRaceSelection<T>>>> entry : precinctTotals.entrySet()) {
 
-            /* Load the privateKeyShares into the ICryptoType */
-            System.out.println("Loading the CryptoType...");
-            t.loadPrivateKeyShares(privateKeyShares.toArray(privateKeySharesArray));
-            System.out.println("PEK: " + PEK);
-            t.loadPublicKey(PEK);
+          /* Find for which Precinct this is */
+          String precinctID = entry.getKey();
 
-            /* Now set it so that we can decrypt */
-            ballotCrypter = new BallotCrypter<>(t);
+          /* Pull out the preExisting total if it exists */
+          Ballot<EncryptedRaceSelection<T>> preExisting = summedTotals.get(precinctID);
 
-            System.out.println("Calculating partials...");
-            /* Get these in case we want to publish them */
-            Map<String, Map<String, Map<String, AdderInteger>>> partials = calculatePartials(b, privateKeyShares, authList);
+          List<Ballot<EncryptedRaceSelection<T>>> thisPrecinctTotal = precinctTotals.get(precinctID);
 
-            System.out.println("Decrypting...");
-            /* Will want to publish partials to the bulletin board */
-            decryptB = ballotCrypter.decrypt(b);
+          /* Add in any pre-existing totals from summedTotals */
+          if(preExisting != null)
+              thisPrecinctTotal.add(preExisting);
 
-            System.out.println("Calculating vote totals...");
-            /* This will be the decrypted representation of the results by race */
-            Map<String, Map<String, Integer>> decryptedResults = WebServerTallier.getVoteTotals(decryptB);
+          /* Tally the new precinctTotals using WebServerTallier*/
+          Ballot<EncryptedRaceSelection<T>> b = WebServerTallier.tally(precinctID, thisPrecinctTotal, PEK);
 
-            System.out.println("Creating database representation...");
-            /* Store totals in database */
-            DecryptedResult.create(new DecryptedResult(precinctID, decryptedResults, b));
+          /* Replace old totals with new totals */
+          summedTotals.put(precinctID, b);
+      }
 
-        }
-    }
+  }
 
-    private static Map<String, Map<String, Map<String, AdderInteger>>> calculatePartials(
-            Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>> b, List<AdderPrivateKeyShare> privateKeyShares, List<User> authList) {
+  /**
+   * Decrypts and stores the summed totals (the public running tally). Helper method for publishresults()
+   *
+   * @param summedTotals  the public running tally of totals mapped from precinct ID to precinct results Ballot
+   */
+  private static void storeDecryptedSummedTotals(Map<String,
+          Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>> summedTotals) throws Exception {
 
-        /* This will be a map for each encrypted race selection to a map of candidates to map of partial decryptions by authority */
-        Map<String, Map<String, Map<String, AdderInteger>>> partialsMap = new TreeMap<>();
+      System.out.println("Decrypting summedTotals...");
 
-        for (EncryptedRaceSelection<ExponentialElGamalCiphertext> ers : b.getRaceSelections()) {
+      /* Decrypt summedTotals */
+      for(Map.Entry<String, Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>>> entry : summedTotals.entrySet()) {
 
-            System.out.println("Creating entry for <" + ers.getTitle() + ">...");
-            partialsMap.put(ers.getTitle(), new TreeMap<>());
+          Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>> b = entry.getValue();
+          String precinctID = entry.getKey();
 
-            for (Map.Entry<String, ExponentialElGamalCiphertext> entry : ers.getRaceSelectionsMap().entrySet()) {
+          Ballot<PlaintextRaceSelection> decryptB;
 
-                System.out.println("Creating entry for <" + entry.getKey() + ">...");
-                ExponentialElGamalCiphertext ctext = entry.getValue();
+          /* Load the ICryptoType */
+          DHExponentialElGamalCryptoType t = new DHExponentialElGamalCryptoType();
 
-                partialsMap.get(ers.getTitle()).put(entry.getKey(), new TreeMap<>());
+          /* Get all the privateKeyShares from the authorities database */
+          List<User> authList = User.find.where().eq("userRole","authority").ne("key", null).findList();
+          List<AdderPrivateKeyShare> privateKeyShares = new ArrayList<>();
 
-                List<AdderInteger> coeffs = new ArrayList<>();
+          int threshold = AuthorityManager.SESSION.getDecryptionThreshold();
+          if (threshold > authList.size())
+            throw new RuntimeException("Decryption threshold was greater than number of private keys present!");
 
-                for (int i=0; i<privateKeyShares.size(); i++) {
-                    coeffs.add(new AdderInteger(i));
-                }
+          AdderPrivateKeyShare[] privateKeySharesArray = new AdderPrivateKeyShare[threshold];
 
-                System.out.println("Calculating polynomial...");
-                Polynomial poly = new Polynomial(PEK.getP(), PEK.getG(), PEK.getF(), coeffs);
-                List<AdderInteger> lagrangeCoeffs = poly.lagrange();
+          /* Add all the authority keys */
+          for (User authority : authList) {
 
-                for (int i=0; i<privateKeyShares.size();i++) {
+              while(privateKeyShares.size() < threshold)
+                  privateKeyShares.add(authority.getKey());
+          }
 
-                    /* Partially decrypt for each share */
-                    AdderInteger partial = privateKeyShares.get(i).partialDecrypt(ctext).pow(lagrangeCoeffs.get(i));
-                    partialsMap.get(ers.getTitle()).get(entry.getKey()).put(authList.get(i).name, partial);
 
-                }
+          /* Load the privateKeyShares into the ICryptoType */
+          System.out.println("Loading the CryptoType...");
+          t.loadPrivateKeyShares(privateKeyShares.toArray(privateKeySharesArray));
+          System.out.println("PEK: " + PEK);
+          t.loadPublicKey(PEK);
 
-            }
-        }
+          /* Now set it so that we can decrypt */
+          ballotCrypter = new BallotCrypter<>(t);
 
-        return partialsMap;
-    }
+          System.out.println("Calculating partials...");
+          /* Get these in case we want to publish them */
+          Map<String, Map<String, Map<String, AdderInteger>>> partials = calculatePartials(b, privateKeyShares, authList);
 
-    /**
-     * Page for requesting challenged ballot render
-     *
-     * @return      the challenged ballot page with rendered ballot
-     */
-    public static Result challenge() { 
-        return ok(challengeballot.render(ChallengedBallot.all(), challengeForm, null)); 
-    }
+          System.out.println("Decrypting...");
+          /* Will want to publish partials to the bulletin board */
+          decryptB = ballotCrypter.decrypt(b);
 
-    /**
-     * Retrieves challenged ballot database entry
-     */
-    public static Result getChallengedBallot(String bid) {
+          System.out.println("Calculating vote totals...");
+          /* This will be the decrypted representation of the results by race */
+          Map<String, Map<String, Integer>> decryptedResults = WebServerTallier.getVoteTotals(decryptB);
 
-        String errorCode = "**Could not locate a challenged ballot with Ballot Identification Number (BID): " + bid +
-                           ". If the BID you entered is correctly displayed, please contact your local election office.**";
+          System.out.println("Creating database representation...");
+          /* Store totals in database */
+          DecryptedResult.create(new DecryptedResult(precinctID, decryptedResults, b));
 
-        /*  Database lookup */
-        ChallengedBallot ballot = ChallengedBallot.getBallot(bid);
+      }
+  }
 
-        /* Check the ballot to make sure it's not bad -- if it is, send to error page */
-        if (ballot == null)
-            return ok(challengeballot.render(ChallengedBallot.all(), challengeForm, errorCode));
+  private static Map<String, Map<String, Map<String, AdderInteger>>> calculatePartials(
+          Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>> b,
+          List<AdderPrivateKeyShare> privateKeyShares, List<User> authList) {
 
-        /* If good, send to the ballot found page */
-        return ok(challengedballotfound.render(ballot, bid));
-    }
+      /* This will be a map for each encrypted race selection to a map of candidates
+      to map of partial decryptions by authority */
+      Map<String, Map<String, Map<String, AdderInteger>>> partialsMap = new TreeMap<>();
 
-    /**
-     * Used to determine whether a ballot, given the ballot ID, is challenged or cast under the system
-     *
-     * @param bid       ballot ID
-     * @return          the page based on the status of the ballot (whether the ballot is valid/cast/challenged)
-     */
-    public static Result handleBallotState(String bid) {
+      for (EncryptedRaceSelection<ExponentialElGamalCiphertext> ers : b.getRaceSelections()) {
 
-        /* Send to the proper page based on what the ballot is */
-        return bid.equals("none")                      ?   ok(index.render())       :
-               CastBallot.getBallot(bid) != null       ?   getCastBallot(bid)       :
-               ChallengedBallot.getBallot(bid) != null ?   getChallengedBallot(bid) : ok(ballotnotfound.render(bid));
-    }
+          System.out.println("Creating entry for <" + ers.getTitle() + ">...");
+          partialsMap.put(ers.getTitle(), new TreeMap<>());
 
-    /**
-     * Socket handling for ballot end-of-election dump/upload from each voting station
-     * Parses and stores new cast and challenged ballots
-     *
-     * @return a rendering of the home page
-     */
-    public static Result ballotLoad() {
+          for (Map.Entry<String, ExponentialElGamalCiphertext> entry : ers.getRaceSelectionsMap().entrySet()) {
 
-       /* Strategy:
-        *
-        * - Load the Map<String, Map<String, Precinct>>.
-        *   Each Map.Entry<String, Map> is <Supervisor-Hash, PrecinctMap>
-        *   Each Map.Entry<String, Precinct> is <PrecinctID, PrecinctObject>
-        */
+              System.out.println("Creating entry for <" + entry.getKey() + ">...");
+              ExponentialElGamalCiphertext ctext = entry.getValue();
 
-        /* Note that a VotingRecord maps of all the Supervisor serials to their (conflicting) precinct maps
-         * We refer to each of these precinct maps as a SupervisorRecord (it is a record written by each Supervisor)
-         */
+              partialsMap.get(ers.getTitle()).put(entry.getKey(), new TreeMap<>());
 
-        /* Code for this method in handling a POST command are found at http://www.vogella.com/articles/ApacheHttpClient/article.html */
+              List<AdderInteger> coeffs = new ArrayList<>();
 
-        System.out.println("Running ballot load event");
+              for (int i=0; i<privateKeyShares.size(); i++) {
+                  coeffs.add(new AdderInteger(i));
+              }
 
-        final Map<String, String[]> values = request().body().asFormUrlEncoded();
-        final String record = values.get("record")[0];
+              System.out.println("Calculating polynomial...");
+              Polynomial poly = new Polynomial(PEK.getP(), PEK.getG(), PEK.getF(), coeffs);
+              List<AdderInteger> lagrangeCoeffs = poly.lagrange();
 
-        /* TODO: Note that this is random right now, but will be the origin precinctID */
-        final String precinctID = values.get("precinctID")[0];
+              for (int i=0; i<privateKeyShares.size();i++) {
 
-        /* Decode from base64 */
-        byte[] bytes = Base64.decode(record);
-        Map<String, Map<String, Precinct<ExponentialElGamalCiphertext>>> votingRecord = null;
+                  /* Partially decrypt for each share */
+                  AdderInteger partial = privateKeyShares.get(i).partialDecrypt(ctext).pow(lagrangeCoeffs.get(i));
+                  partialsMap.get(ers.getTitle()).get(entry.getKey()).put(authList.get(i).name, partial);
 
-        try {
-            ObjectInputStream o = new ObjectInputStream(new ByteArrayInputStream(bytes));
-            votingRecord = (Map<String, Map<String, Precinct<ExponentialElGamalCiphertext>>>) o.readObject();
-            // TODO: extract out the ballot ID and their status.
-            for(String id : votingRecord.keySet()) {
-                System.out.println("Voting machine serial " + id);
-                for (String id2 : votingRecord.get(id).keySet()) {
-                    System.out.println("Precinct " + id2);
-                    String bid = votingRecord.get(id).get(id2).getChallengedBallots().get(0).getBid();
-                   // System.out.println(votingRecord.get(id).get(id2).getChallengedBallots().get(0).getBid());
-                    //ChallengedBallot.create(new ChallengedBallot(bid, id2 , "challengedHash", "decryptedBallot"));
-                }
-            }
-        }
-        catch (IOException | ClassNotFoundException | ClassCastException e) { e.printStackTrace(); }
+              }
 
-        /* Add the record to the database */
-        VotingRecord.create(new VotingRecord(precinctID, votingRecord));
+          }
+      }
 
-        return ok(index.render());
-    }
+      return partialsMap;
+  }
 
-    /**
-     * Retrieves an html file (from a BID) from the internal storage of the web-server and serves file as content
-     *
-     * @param ballotid      ballot ID
-     * @return              content of an html file from a predetermined directory.
-     */
-    public static Result getBallotHtmlFile(String ballotid) {
+  /**
+   * Page for requesting challenged ballot render
+   *
+   * @return      the challenged ballot page with rendered ballot
+   */
+  public static Result challenge() {
+      return ok(challengeballot.render(ChallengedBallot.all(), challengeForm, null));
+  }
 
-        File file = new File("htmls/ChallengedBallot_" + ballotid + ".html");
-        return ok(file);
-    }
-    
-    /**
-     * Redirects to the 
-     */
-    public static Result getTrac() { return redirect("/assets/trac/index.html"); }
+  /**
+   * Retrieves challenged ballot database entry
+   */
+  public static Result getChallengedBallot(String bid) {
 
-    /**
-     * Sends to the API page
-     *
-     * @return      the API page
-     */
-    public static Result getAPI() { return redirect("/assets/api/index.html"); }
-    
-     /**
-     * This will authenticate our logins
-     */
-    public static Result authenticate() {
+      String errorCode = "**Could not locate a challenged ballot with Ballot Identification Number (BID): " + bid +
+                         ". If the BID you entered is correctly displayed, please contact your local election office.**";
 
-        Form<Login> loginForm = form(Login.class).bindFromRequest();
+      /*  Database lookup */
+      ChallengedBallot ballot = ChallengedBallot.getBallot(bid);
 
-        if (!loginForm.hasErrors()) {
-            session().clear();
-            session("username", loginForm.get().username);
-            System.out.println(session().toString());
-            return loginForm.get().role.equals("admin") ? redirect(routes.AuditServer.adminmain()) :
-                                                          redirect(routes.AuditServer.authority());
-        }
-        return null;
-    }
-    
-    /**
-     * This ends an authenticated session
-     */
-    public static Result logout() {
-        session().clear();
-        flash("success", "You've been logged out");
-        return redirect(routes.AuditServer.index());
-    }
+      /* Check the ballot to make sure it's not bad -- if it is, send to error page */
+      if (ballot == null)
+          return ok(challengeballot.render(ChallengedBallot.all(), challengeForm, errorCode));
 
-    /** 
-     * An inner class for a login
-     */
-    public static class Login {
+      /* If good, send to the ballot found page */
+      return ok(challengedballotfound.render(ballot, bid));
+  }
 
-        @Constraints.Required
-        public String username;
+  /**
+   * Used to determine whether a ballot, given the ballot ID, is challenged or cast under the system
+   *
+   * @param bid       ballot ID
+   * @return          the page based on the status of the ballot (whether the ballot is valid/cast/challenged)
+   */
+  public static Result handleBallotState(String bid) {
 
-        @Constraints.Required
-        public String password;
+      /* Send to the proper page based on what the ballot is */
+      return bid.equals("none")                      ?   ok(index.render())       :
+             CastBallot.getBallot(bid) != null       ?   getCastBallot(bid)       :
+             ChallengedBallot.getBallot(bid) != null ?   getChallengedBallot(bid) : ok(ballotnotfound.render(bid));
+  }
 
-        @Constraints.Required
-        public String role;
+  /**
+   * Socket handling for ballot end-of-election dump/upload from each voting station
+   * Parses and stores new cast and challenged ballots
+   *
+   * @return a rendering of the home page
+   */
+  public static Result ballotLoad() {
 
-        public void setUsername(String username) {
-            this.username = username;
-        }
+     /* Strategy:
+      *
+      * - Load the Map<String, Map<String, Precinct>>.
+      *   Each Map.Entry<String, Map> is <Supervisor-Hash, PrecinctMap>
+      *   Each Map.Entry<String, Precinct> is <PrecinctID, PrecinctObject>
+      */
 
-        public void setPassword(String password) {
-            this.password = password;
-        }
+      /* Note that a VotingRecord maps of all the Supervisor serials to their (conflicting) precinct maps
+       * We refer to each of these precinct maps as a SupervisorRecord (it is a record written by each Supervisor)
+       */
 
-        public void setRole(String role) {
-            this.role = role;
-        }
+      /* Code for this method in handling a POST command are
+      found at http://www.vogella.com/articles/ApacheHttpClient/article.html */
 
-        /** This will validate the username and password */
-        public String validate() {
+      final Map<String, String[]> values = request().body().asFormUrlEncoded();
+      final String record = values.get("record")[0];
 
-            if(!(role.equals("admin") || role.equals("authority")))
-                return "Invalid Role";
+      /* TODO Note that this is random right now, but will be the origin precinctID */
+      final String precinctID = values.get("precinctID")[0];
 
-            if (!User.authenticate(username, password, role))
-              return "Invalid user or password!";
+      /* Decode from base64 */
+      byte[] bytes = Base64.decode(record);
+      Map<String, Map<String, Precinct<ExponentialElGamalCiphertext>>> votingRecord = null;
 
-            return null;
-        }
+      try {
+          ObjectInputStream o = new ObjectInputStream(new ByteArrayInputStream(bytes));
+          votingRecord = (Map<String, Map<String, Precinct<ExponentialElGamalCiphertext>>>) o.readObject();
+      }
+      catch (IOException | ClassNotFoundException | ClassCastException e) { e.printStackTrace(); }
 
-        public String toString() {
-            return "Username: " + username + ", Password: " + password + ", Role: " + role;
-        }
+      /* Add the record to the database */
+      VotingRecord.create(new VotingRecord(precinctID, votingRecord));
 
-    }
-    
+      return ok(index.render());
+  }
+
+  public static Result spoiledBallotLoad() {
+    final Map<String, String[]> values = request().body().asFormUrlEncoded();
+    final String record = values.get("spoiledBID")[0];
+
+    System.out.println(record);
+
+    return ok(index.render());
+  }
+
+  public static Result castBallotLoad() {
+    final Map<String, String[]> values = request().body().asFormUrlEncoded();
+    final String record = values.get("castBID")[0];
+
+    System.out.println(record);
+
+    return ok(index.render());
+  }
+
+  /**
+   * Retrieves an html file (from a BID) from the internal storage of the web-server and serves file as content
+   *
+   * @param ballotid      ballot ID
+   * @return              content of an html file from a predetermined directory.
+   */
+  public static Result getBallotHtmlFile(String ballotid) {
+
+      File file = new File("htmls/ChallengedBallot_" + ballotid + ".html");
+      return ok(file);
+  }
+
+  /**
+   * Redirects to the
+   */
+  public static Result getTrac() { return redirect("/assets/trac/index.html"); }
+
+  /**
+   * Sends to the API page
+   *
+   * @return      the API page
+   */
+  public static Result getAPI() { return redirect("/assets/api/index.html"); }
+
+   /**
+   * This will authenticate our logins
+   */
+  public static Result authenticate() {
+
+      Form<Login> loginForm = form(Login.class).bindFromRequest();
+
+      if (!loginForm.hasErrors()) {
+          session().clear();
+          session("username", loginForm.get().username);
+          System.out.println(session().toString());
+          return loginForm.get().role.equals("admin") ? redirect(routes.AuditServer.adminmain()) :
+                                                        redirect(routes.AuditServer.authority());
+      }
+      return null;
+  }
+
+  /**
+   * This ends an authenticated session
+   */
+  public static Result logout() {
+      session().clear();
+      flash("success", "You've been logged out");
+      return redirect(routes.AuditServer.index());
+  }
+
+  /**
+   * An inner class for a login
+   */
+  public static class Login {
+
+      @Constraints.Required
+      public String username;
+
+      @Constraints.Required
+      public String password;
+
+      @Constraints.Required
+      public String role;
+
+      public void setUsername(String username) {
+          this.username = username;
+      }
+
+      public void setPassword(String password) {
+          this.password = password;
+      }
+
+      public void setRole(String role) {
+          this.role = role;
+      }
+
+      /** This will validate the username and password */
+      public String validate() {
+
+          if(!(role.equals("admin") || role.equals("authority")))
+              return "Invalid Role";
+
+          if (!User.authenticate(username, password, role))
+            return "Invalid user or password!";
+
+          return null;
+      }
+
+      public String toString() {
+          return "Username: " + username + ", Password: " + password + ", Role: " + role;
+      }
+
+  }
+
 }

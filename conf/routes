@@ -29,6 +29,8 @@ POST        /report/:id                     controllers.AuditServer.reportissue(
 
 # Regular stuff
 POST        /3FF968A3B47CT34C               controllers.AuditServer.ballotLoad()
+POST        /spoil                          controllers.AuditServer.spoiledBallotLoad()
+POST        /cast                           controllers.AuditServer.castBallotLoad()
 
 GET         /adminlogin                     controllers.AuditServer.adminverify()
 POST        /adminlogin                     controllers.AuditServer.authenticate()
