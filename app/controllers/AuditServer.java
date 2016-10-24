@@ -2,6 +2,7 @@ package controllers;
 
 import be.objectify.deadbolt.java.actions.Group;
 import be.objectify.deadbolt.java.actions.Restrict;
+import com.googlecode.javacpp.annotation.Cast;
 import crypto.*;
 import crypto.adder.AdderInteger;
 import crypto.adder.AdderPrivateKeyShare;
@@ -882,18 +883,24 @@ public class AuditServer extends Controller {
 
   public static Result spoiledBallotLoad() {
     final Map<String, String[]> values = request().body().asFormUrlEncoded();
-    final String record = values.get("spoiledBID")[0];
-
-    System.out.println(record);
+    final String spoiledBID = values.get("spoiledBID")[0];
+    final String spoilePrecinct = values.get("spoiledPrecinct")[0];
+    if (ChallengedBallot.getBallot(spoiledBID) != null) {
+      ChallengedBallot.create(new ChallengedBallot(spoiledBID, spoilePrecinct, "challengedHash", "decryptedBallot"));
+    }
+    System.out.println(spoiledBID);
 
     return ok(index.render());
   }
 
   public static Result castBallotLoad() {
     final Map<String, String[]> values = request().body().asFormUrlEncoded();
-    final String record = values.get("castBID")[0];
+    final String castBID = values.get("castBID")[0];
 
-    System.out.println(record);
+    if(CastBallot.getBallot(castBID) != null){
+      CastBallot.create(new CastBallot(castBID, "castHash"));
+    }
+    System.out.println(castBID);
 
     return ok(index.render());
   }
