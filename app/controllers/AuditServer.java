@@ -884,9 +884,10 @@ public class AuditServer extends Controller {
   public static Result spoiledBallotLoad() {
     final Map<String, String[]> values = request().body().asFormUrlEncoded();
     final String spoiledBID = values.get("spoiledBID")[0];
-    final String spoilePrecinct = values.get("spoiledPrecinct")[0];
-    if (ChallengedBallot.getBallot(spoiledBID) != null) {
-      ChallengedBallot.create(new ChallengedBallot(spoiledBID, spoilePrecinct, "challengedHash", "decryptedBallot"));
+    //final String spoiledPrecinct = values.get("spoiledPrecinct")[0];
+    if (ChallengedBallot.getBallot(spoiledBID) == null) {
+
+      ChallengedBallot.create(new ChallengedBallot(spoiledBID, "spoiledPrecinct", "challengedHash", "decryptedBallot"));
     }
     System.out.println(spoiledBID);
 
@@ -897,7 +898,7 @@ public class AuditServer extends Controller {
     final Map<String, String[]> values = request().body().asFormUrlEncoded();
     final String castBID = values.get("castBID")[0];
 
-    if(CastBallot.getBallot(castBID) != null){
+    if(CastBallot.getBallot(castBID) == null){
       CastBallot.create(new CastBallot(castBID, "castHash"));
     }
     System.out.println(castBID);
