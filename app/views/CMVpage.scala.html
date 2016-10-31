@@ -14,8 +14,7 @@
 
     <script type="text/javascript">
 
-            //var bidRegex = /^([A-Z0-9]{3}-){2}[A-Z0-9]{3}$/i;
-            var bidRegex = /.*/;
+            var bidRegex = /^([0-9]{3}-){2}[0-9]{3}$/i;
             var last = "";
 
             document.getElementById("submitID").onclick =
@@ -26,7 +25,10 @@
                         var input = document.getElementById('idText').value;
 
                         if (bidRegex.test(input)) {
-                            location.href = '/check/' + input;
+
+                            var newInput = input.replace(/-/g, "");
+
+                            location.href = '/check/' + newInput;
                             input.className = "";
                         } else {
                             document.getElementById("errorLabel").style.opacity = 1;
@@ -35,14 +37,14 @@
                         }
                     };
 
-           /* document.getElementById("idText").addEventListener("input", function() {
+           document.getElementById("idText").addEventListener("input", function() {
                 var start = this.selectionStart,
                         end = this.selectionEnd;
 
                 this.value = this.value.split("-").join("").match(/[A-Z0-9]{1,3}/ig).join("-");
 
-                //if(this.value.length < 11 && this.value.split("-").join("").length % 3 == 0)
-                //    this.value += "-";
+                if(this.value.length < 11 && this.value.split("-").join("").length % 3 == 0)
+                    this.value += "-";
 
                 if(this.value.length > last.length) {
                     this.setSelectionRange(start+1, end+1);
@@ -61,7 +63,7 @@
 
                }
             }
-            ); */
+            );
     </script>
 
 }
