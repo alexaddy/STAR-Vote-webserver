@@ -54,16 +54,19 @@ public class VotingRecord extends Model {
             supervisorRecords.put(entry.getKey(), new SupervisorRecord(this, entry.getKey(), recordToString(entry.getValue())));
             for (Map.Entry<String, Precinct<ExponentialElGamalCiphertext>> precinctEntry : entry.getValue().entrySet()) {
                 for (Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>> challengedBallot : precinctEntry.getValue().getChallengedBallots()) {
-                    if (ChallengedBallot.getBallot(challengedBallot.getBid()) == null) {
+                    if (ChallengedBallot.getBallot(challengedBallot.getBid()) != null) {
                         System.out.println("Get challenged ballot " + challengedBallot.getBid());
-                        ChallengedBallot.create(new ChallengedBallot(challengedBallot.getBid(), precinctEntry.getKey(), "challengedHash", "decryptedBallot"));
+                        ChallengedBallot.remove(ChallengedBallot.getBallot(challengedBallot.getBid()));
                     }
+                    ChallengedBallot.create(new ChallengedBallot(challengedBallot.getBid(), precinctEntry.getKey(), "challengedHash", "decryptedBallot"));
+
                 }
                 for (Ballot<EncryptedRaceSelection<ExponentialElGamalCiphertext>> castedBallot : precinctEntry.getValue().getCastedBallots()) {
-                    if (CastBallot.getBallot(castedBallot.getBid()) == null) {
+                    if (CastBallot.getBallot(castedBallot.getBid()) != null) {
                         System.out.println("Get casted ballot " + castedBallot.getBid());
-                        CastBallot.create(new CastBallot(castedBallot.getBid(), "casHash"));
+                        CastBallot.remove(CastBallot.getBallot(castedBallot.getBid()));
                     }
+                    CastBallot.create(new CastBallot(castedBallot.getBid(), "casHash"));
                 }
             }
         }
