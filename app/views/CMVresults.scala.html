@@ -12,14 +12,16 @@
     } else {
         @if(status == "challenged") {
 
-            <div id = "msg" class="warning">
+            <div id = "msg" class="warning" style="margin-bottom: 20px">
                 <img src="/assets/images/warning.png" class = "icon"/>
                 <p> Your ballot (#@id) was not placed in the ballot box, so the ballot was not counted in the election tally. </p>
 
             </div>
-            <div id = "pdf" class="spoiledballot">
-                <embed src="/assets/ballots/HelloWorld.pdf" />
-            </div>
+          <!--
+            <div style = "margin-top: 20px; padding-top: 20px">
+                    <embed src="/assets/ballots/HelloWorld.pdf" />
+
+            </div> -->
 
         } else {
             @if(status == "invalid") {
@@ -39,8 +41,10 @@
 
     <div id= "contentbuttons">
         <ul>
+            <li><a href="/report/@id"> View My Ballot </a></li>
             <li><a href="/check"> Enter another ballot ID </a></li>
             <li><a href="/report/@id"> Report an issue </a></li>
+
         </ul>
     </div>
 
