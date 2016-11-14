@@ -2,7 +2,7 @@ package controllers;
 
 import be.objectify.deadbolt.java.actions.Group;
 import be.objectify.deadbolt.java.actions.Restrict;
-import com.googlecode.javacpp.annotation.Cast;
+//import com.googlecode.javacpp.annotation.Cast;
 import crypto.*;
 import crypto.adder.AdderInteger;
 import crypto.adder.AdderPrivateKeyShare;
@@ -15,6 +15,7 @@ import play.data.validation.Constraints;
 import play.mvc.Controller;
 import play.mvc.Result;
 import play.mvc.Security;
+import printer.BoxPrinter;
 import security.Secured;
 import sexpression.ASEConverter;
 import sexpression.ASExpression;
@@ -23,6 +24,7 @@ import sexpression.stream.Base64;
 import supervisor.model.AuthorityManager;
 import supervisor.model.Ballot;
 import supervisor.model.Precinct;
+import utilities.BallotLoader;
 import utilities.WebServerTallier;
 import views.html.*;
 
@@ -448,6 +450,8 @@ public class AuditServer extends Controller {
 
     return ok(adminpublish.render(VotingRecord.getUnpublished(), VotingRecord.getPublished(), PEK != null, ""));
   }
+
+
 
   /*---------------------------------------- ADMIN METHODS -----------------------------------------------*/
 
@@ -917,6 +921,32 @@ public class AuditServer extends Controller {
     File file = new File("htmls/ChallengedBallot_" + ballotid + ".html");
     return ok(file);
   }
+
+
+  //Starting pdf renderer
+  public static Result renderPDF(String ballotid) {
+
+      ChallengedBallot challengedBallot = ChallengedBallot.getBallot(ballotid);
+
+      if(challengedBallot == null){
+          return ok(index.render);
+      }
+
+
+      File ballotFile = BallotLoader.getBallotFileByPrecinct(challengedBallot.precinct);
+      List<List<String>> raceGroups = BallotLoader.getRaceGroupByPrecinct(challengedBallot.precinct);
+
+      try {
+          BoxPrinter.printCommittedBallot(null, ballotid, raceGroups, ballotFile);
+      } catch (IOException e) {
+          e.printStackTrace();
+      }
+
+      return ok(index.render);
+
+  }
+
+
 
   /**
    * Redirects to the

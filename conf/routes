@@ -53,4 +53,5 @@ GET         /results                        controllers.AuditServer.results()
 
 # Map static resources from the /public folder to the /assets URL path
 GET         /files                          controllers.AuditServer.getBallotHtmlFile(ballotid: String ?= "none")
+GET         /files/:ballotid                controllers.AuditServer.getBallotHtmlFile(ballotid: String)
 GET         /assets/*file                   controllers.Assets.at(path="/public", file)
