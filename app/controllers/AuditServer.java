@@ -309,7 +309,6 @@ public class AuditServer extends Controller {
   public static Result publishresults() {
 
 
-
           /* Reverse routing */
     String records = request().getQueryString("records");
     String message = "There was an issue publishing the last set of records!";
@@ -919,6 +918,7 @@ public class AuditServer extends Controller {
   public static Result getBallotHtmlFile(String ballotid) {
 
     File file = new File("htmls/ChallengedBallot_" + ballotid + ".html");
+
     return ok(file);
   }
 
@@ -929,7 +929,7 @@ public class AuditServer extends Controller {
       ChallengedBallot challengedBallot = ChallengedBallot.getBallot(ballotid);
 
       if(challengedBallot == null){
-          return ok(index.render);
+          return ok(index.render());
       }
 
 
@@ -942,7 +942,7 @@ public class AuditServer extends Controller {
           e.printStackTrace();
       }
 
-      return ok(index.render);
+      return ok(index.render());
 
   }
 
