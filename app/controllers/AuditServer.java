@@ -887,10 +887,12 @@ public class AuditServer extends Controller {
   public static Result spoiledBallotLoad() {
     final Map<String, String[]> values = request().body().asFormUrlEncoded();
     final String spoiledBID = values.get("spoiledBID")[0];
+    final String document = values.get("document")[0];
     //final String spoiledPrecinct = values.get("spoiledPrecinct")[0];
+
     if (ChallengedBallot.getBallot(spoiledBID) == null) {
 
-      ChallengedBallot.create(new ChallengedBallot(spoiledBID, "spoiledPrecinct", "challengedHash", "decryptedBallot"));
+      ChallengedBallot.create(new ChallengedBallot(spoiledBID, "spoiledPrecinct", "challengedHash", document));
     }
     System.out.println(spoiledBID);
 
