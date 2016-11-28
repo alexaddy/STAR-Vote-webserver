@@ -91,6 +91,10 @@ public class AuditServer extends Controller {
     return ok(CMVresults.render(status, bid));
   }
 
+  public static Result displayPDF() {
+    return ok(ballotPDF.render());
+  }
+
   /**
    * Serves the "poll results" page of the site
    *
